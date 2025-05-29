@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -143,14 +142,14 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
 
             onSigned(signedDocument);
 
-            // Create download link
+            // Create download link using window.document
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${document.name}_assinado.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            const downloadLink = window.document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = `${document.name}_assinado.png`;
+            window.document.body.appendChild(downloadLink);
+            downloadLink.click();
+            window.document.body.removeChild(downloadLink);
             URL.revokeObjectURL(url);
 
             toast({
@@ -182,9 +181,9 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     }
 
     // Simulate download of signed document
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = `${document.name}_assinado.pdf`;
+    const downloadLink = window.document.createElement('a');
+    downloadLink.href = '#';
+    downloadLink.download = `${document.name}_assinado.pdf`;
     toast({
       title: "Download iniciado",
       description: "O download do documento assinado foi iniciado",
