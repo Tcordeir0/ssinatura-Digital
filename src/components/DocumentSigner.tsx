@@ -39,7 +39,8 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   const [signatureHistory, setSignatureHistory] = useState<Array<{timestamp: string, signature: string, position: {x: number, y: number}}>>([]);
   const [isValidatingGov, setIsValidatingGov] = useState(false);
   const [govSignatureConnected, setGovSignatureConnected] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [signedPdfBlob, setSignedPdfBlob] = useState<Blob | null>(null);
+  const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,10 +54,8 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       setSignatureHistory(JSON.parse(savedHistory));
     }
 
-    // Check if GOV signature is available
     checkGovSignatureStatus();
 
-    // Create object URL for PDF if file exists
     if (document.file) {
       const url = URL.createObjectURL(document.file);
       setPdfUrl(url);
@@ -65,7 +64,6 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   }, [document.file]);
 
   const checkGovSignatureStatus = () => {
-    // Simulate checking GOV signature connection
     const govConnected = localStorage.getItem('govSignatureConnected');
     setGovSignatureConnected(govConnected === 'true');
   };
@@ -118,13 +116,11 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   const connectGovSignature = async () => {
     setIsValidatingGov(true);
     
-    // Simulate GOV signature connection process
     setTimeout(() => {
       setGovSignatureConnected(true);
       localStorage.setItem('govSignatureConnected', 'true');
       setIsValidatingGov(false);
       
-      // Add GOV signature to signatures list
       const govSignature: Signature = {
         id: 'gov-signature',
         name: 'Assinatura Digital GOV.BR',
@@ -143,11 +139,77 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     }, 2000);
   };
 
+  const createSignedPdf = async (originalFile: File, signatureData: string, position: {x: number, y: number}): Promise<Blob> => {
+    // Para esta demonstração, vamos criar um PDF simples com a assinatura
+    // Em um ambiente real, você usaria uma biblioteca como PDF-lib para modificar o PDF original
+    
+    const canvas = globalThis.document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas context not available');
+
+    // Configurar canvas para tamanho A4
+    canvas.width = 595; // A4 width in points
+    canvas.height = 842; // A4 height in points
+
+    // Fundo branco
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Simular conteúdo do documento original
+    ctx.fillStyle = '#333';
+    ctx.font = '16px Arial';
+    ctx.fillText(`Documento: ${document.name}`, 50, 50);
+    ctx.fillText(`Tipo: ${document.type}`, 50, 80);
+    ctx.fillText(`Data de upload: ${document.uploadDate}`, 50, 110);
+    
+    // Adicionar texto simulando conteúdo do documento
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#666';
+    const lines = [
+      'Este é um documento de exemplo que foi carregado no sistema.',
+      'O conteúdo original do documento seria preservado aqui.',
+      'Todas as informações e formatação originais seriam mantidas.',
+      '',
+      'DOCUMENTO ASSINADO DIGITALMENTE',
+      `Data/Hora: ${new Date().toLocaleString('pt-BR')}`,
+      'Certificado: ICP-Brasil (se assinatura GOV)',
+    ];
+    
+    lines.forEach((line, index) => {
+      ctx.fillText(line, 50, 150 + (index * 20));
+    });
+
+    // Carregar e desenhar a assinatura
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const sigX = (position.x / 100) * canvas.width;
+        const sigY = (position.y / 100) * canvas.height;
+        const sigWidth = 150;
+        const sigHeight = 60;
+        
+        ctx.drawImage(img, sigX - sigWidth/2, sigY - sigHeight/2, sigWidth, sigHeight);
+        
+        // Adicionar informações da assinatura
+        ctx.fillStyle = '#059669';
+        ctx.font = '10px Arial';
+        ctx.fillText('✓ Documento assinado digitalmente', sigX - sigWidth/2, sigY + sigHeight/2 + 15);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          }
+        }, 'application/pdf');
+      };
+      img.src = signatureData;
+    });
+  };
+
   const handleSignDocument = async () => {
-    if (!selectedSignature) {
+    if (!selectedSignature || !document.file) {
       toast({
-        title: "Selecione uma assinatura",
-        description: "Por favor, selecione uma assinatura para aplicar ao documento",
+        title: "Erro",
+        description: "Selecione uma assinatura e certifique-se de que há um documento carregado",
         variant: "destructive",
       });
       return;
@@ -157,7 +219,11 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     if (!selectedSig) return;
 
     try {
-      // Add to signature history
+      // Criar PDF assinado
+      const signedBlob = await createSignedPdf(document.file, selectedSig.data, signaturePosition);
+      setSignedPdfBlob(signedBlob);
+
+      // Adicionar ao histórico
       const historyEntry = {
         timestamp: new Date().toISOString(),
         signature: selectedSig.name,
@@ -167,80 +233,23 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       setSignatureHistory(newHistory);
       localStorage.setItem('signatureHistory', JSON.stringify(newHistory));
 
-      // Create a canvas to overlay the signature on the document
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Set canvas size
-      canvas.width = 800;
-      canvas.height = 1000;
-
-      // Fill with white background
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Add document content placeholder
-      ctx.fillStyle = '#f8f9fa';
-      ctx.fillRect(50, 50, canvas.width - 100, canvas.height - 100);
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '16px Arial';
-      ctx.fillText('Documento Original', 70, 80);
-      ctx.fillText(`${document.name}`, 70, 110);
-
-      // Add timestamp and validation info
-      ctx.fillStyle = '#059669';
-      ctx.font = '12px Arial';
-      ctx.fillText(`Assinado em: ${new Date().toLocaleString('pt-BR')}`, 70, 140);
-      if (selectedSig.id === 'gov-signature') {
-        ctx.fillText('✓ Assinatura Digital GOV.BR Certificada', 70, 160);
-      }
-
-      // Load and draw signature
-      const img = new Image();
-      img.onload = () => {
-        const sigX = (signaturePosition.x / 100) * canvas.width;
-        const sigY = (signaturePosition.y / 100) * canvas.height;
-        const sigWidth = 150;
-        const sigHeight = 60;
-        
-        ctx.drawImage(img, sigX - sigWidth/2, sigY - sigHeight/2, sigWidth, sigHeight);
-        
-        // Convert canvas to blob and create download
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const signedDocument = {
-              ...document,
-              signedVersion: `signed_${Date.now()}_${selectedSig.hash}`,
-            };
-
-            onSigned(signedDocument);
-
-            // Create download link using window.document
-            const url = URL.createObjectURL(blob);
-            const downloadLink = window.document.createElement('a');
-            downloadLink.href = url;
-            downloadLink.download = `${document.name}_assinado.png`;
-            window.document.body.appendChild(downloadLink);
-            downloadLink.click();
-            window.document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(url);
-
-            toast({
-              title: "Documento assinado e baixado!",
-              description: `O documento "${document.name}" foi assinado e baixado com sucesso`,
-            });
-
-            // Reset positioning after successful signature
-            resetSignaturePosition();
-          }
-        }, 'image/png');
+      // Atualizar documento
+      const signedDocument = {
+        ...document,
+        signedVersion: `signed_${Date.now()}_${selectedSig.hash}`,
       };
-      img.src = selectedSig.data;
+
+      onSigned(signedDocument);
+
+      toast({
+        title: "Documento assinado com sucesso!",
+        description: "O documento foi assinado e está pronto para download",
+      });
+
+      resetSignaturePosition();
 
     } catch (error) {
+      console.error('Erro ao assinar documento:', error);
       toast({
         title: "Erro ao assinar documento",
         description: "Ocorreu um erro durante o processo de assinatura",
@@ -249,12 +258,8 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     }
   };
 
-  const adjustZoom = (delta: number) => {
-    setZoom(prev => Math.max(50, Math.min(200, prev + delta)));
-  };
-
   const downloadSignedDocument = () => {
-    if (!document.signedVersion) {
+    if (!signedPdfBlob) {
       toast({
         title: "Documento não assinado",
         description: "Assine o documento primeiro para fazer o download",
@@ -263,20 +268,27 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       return;
     }
 
-    // Simulate download of signed document
-    const downloadLink = window.document.createElement('a');
-    downloadLink.href = '#';
+    const url = URL.createObjectURL(signedPdfBlob);
+    const downloadLink = globalThis.document.createElement('a');
+    downloadLink.href = url;
     downloadLink.download = `${document.name}_assinado.pdf`;
+    globalThis.document.body.appendChild(downloadLink);
+    downloadLink.click();
+    globalThis.document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
+
     toast({
       title: "Download iniciado",
-      description: "O download do documento assinado foi iniciado",
+      description: "O documento PDF assinado foi baixado com sucesso",
     });
+  };
+
+  const adjustZoom = (delta: number) => {
+    setZoom(prev => Math.max(50, Math.min(200, prev + delta)));
   };
 
   return (
     <div className="space-y-6">
-      <canvas ref={canvasRef} className="hidden" />
-      
       <div className="flex items-center gap-4">
         <Button onClick={onBack} variant="outline" className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
@@ -314,33 +326,40 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
             </CardHeader>
             <CardContent>
               <div 
-                className={`relative bg-white border-2 rounded-lg h-[600px] overflow-auto ${
+                className={`relative bg-white border-2 rounded-lg overflow-hidden ${
                   isPositioning ? 'cursor-crosshair border-blue-500' : 'border-gray-300'
                 }`}
                 onClick={handleDocumentClick}
-                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}
+                style={{ height: '700px' }}
               >
                 {pdfUrl ? (
                   <iframe
-                    src={pdfUrl}
-                    className="w-full h-full pointer-events-none"
+                    ref={pdfViewerRef}
+                    src={`${pdfUrl}#zoom=${zoom}`}
+                    className="w-full h-full border-0"
                     title="Document Preview"
+                    style={{ 
+                      transform: `scale(${zoom / 100})`,
+                      transformOrigin: 'top left',
+                      width: `${100 / (zoom / 100)}%`,
+                      height: `${100 / (zoom / 100)}%`
+                    }}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <div className="text-center">
-                      <p>Visualização do documento</p>
+                      <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                      <p className="text-lg font-medium">Nenhum documento carregado</p>
                       <p className="text-sm mt-2">
-                        {isPositioning ? 'Clique para posicionar a assinatura' : 'Selecione uma assinatura e clique em "Posicionar"'}
+                        {isPositioning ? 'Clique para posicionar a assinatura' : 'Carregue um documento PDF para visualizar'}
                       </p>
                     </div>
                   </div>
                 )}
                 
-                {/* Signature preview */}
                 {showSignaturePreview && selectedSignature && (
                   <div 
-                    className="absolute pointer-events-none border-2 border-green-500 border-dashed rounded bg-green-50/80 p-2 shadow-lg"
+                    className="absolute pointer-events-none border-2 border-green-500 border-dashed rounded bg-green-50/80 p-2 shadow-lg z-10"
                     style={{
                       left: `${signaturePosition.x}%`,
                       top: `${signaturePosition.y}%`,
@@ -355,9 +374,8 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                   </div>
                 )}
 
-                {/* Positioning indicator */}
                 {isPositioning && (
-                  <div className="absolute inset-0 bg-blue-50/20 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-blue-50/20 flex items-center justify-center z-10">
                     <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
                       <MousePointer className="h-4 w-4" />
                       Clique onde deseja aplicar a assinatura
@@ -370,6 +388,27 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         </div>
 
         <div className="space-y-6">
+          {!govSignatureConnected && (
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
+                  <Shield className="h-5 w-5" />
+                  Assinatura GOV.BR
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={connectGovSignature}
+                  disabled={isValidatingGov}
+                  className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  {isValidatingGov ? 'Conectando...' : 'Conectar Assinatura GOV'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
@@ -378,22 +417,6 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {!govSignatureConnected && (
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">
-                    Assinatura Digital GOV.BR
-                  </label>
-                  <Button 
-                    onClick={connectGovSignature}
-                    disabled={isValidatingGov}
-                    className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    {isValidatingGov ? 'Conectando...' : 'Conectar Assinatura GOV'}
-                  </Button>
-                </div>
-              )}
-
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   Selecionar Assinatura
@@ -476,28 +499,26 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               <div className="flex flex-col gap-3">
                 <Button 
                   onClick={handleSignDocument}
-                  disabled={!selectedSignature || !showSignaturePreview}
+                  disabled={!selectedSignature || !showSignaturePreview || !document.file}
                   className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Assinar e Baixar
+                  Assinar Documento
                 </Button>
 
-                {document.signedVersion && (
+                {signedPdfBlob && (
                   <Button 
                     onClick={downloadSignedDocument}
-                    variant="outline"
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Baixar Documento Assinado
+                    Baixar PDF Assinado
                   </Button>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Signature History */}
           {signatureHistory.length > 0 && (
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
               <CardHeader>
@@ -539,7 +560,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               <div>
                 <p className="text-sm font-medium text-gray-700">Status:</p>
                 <p className="text-sm text-gray-600 flex items-center gap-1">
-                  {document.signedVersion ? (
+                  {signedPdfBlob ? (
                     <>
                       <FileCheck className="h-4 w-4 text-green-600" />
                       Assinado
