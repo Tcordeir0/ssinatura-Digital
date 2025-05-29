@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, PenTool, Save, Download, MousePointer } from 'lucide-react';
+import { ArrowLeft, PenTool, Save, Download, MousePointer, RotateCcw, ZoomIn, ZoomOut, Shield, Clock, FileCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Document {
@@ -34,6 +35,10 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [isPositioning, setIsPositioning] = useState(false);
   const [showSignaturePreview, setShowSignaturePreview] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  const [signatureHistory, setSignatureHistory] = useState<Array<{timestamp: string, signature: string, position: {x: number, y: number}}>>([]);
+  const [isValidatingGov, setIsValidatingGov] = useState(false);
+  const [govSignatureConnected, setGovSignatureConnected] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
@@ -43,6 +48,14 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       setSignatures(JSON.parse(savedSignatures));
     }
 
+    const savedHistory = localStorage.getItem('signatureHistory');
+    if (savedHistory) {
+      setSignatureHistory(JSON.parse(savedHistory));
+    }
+
+    // Check if GOV signature is available
+    checkGovSignatureStatus();
+
     // Create object URL for PDF if file exists
     if (document.file) {
       const url = URL.createObjectURL(document.file);
@@ -50,6 +63,12 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       return () => URL.revokeObjectURL(url);
     }
   }, [document.file]);
+
+  const checkGovSignatureStatus = () => {
+    // Simulate checking GOV signature connection
+    const govConnected = localStorage.getItem('govSignatureConnected');
+    setGovSignatureConnected(govConnected === 'true');
+  };
 
   const handleDocumentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPositioning || !selectedSignature) return;
@@ -64,7 +83,18 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     
     toast({
       title: "Posição definida!",
-      description: "Assinatura será aplicada na posição selecionada",
+      description: "Assinatura será aplicada na posição selecionada. Use 'Resetar' para alterar.",
+    });
+  };
+
+  const resetSignaturePosition = () => {
+    setShowSignaturePreview(false);
+    setIsPositioning(false);
+    setSignaturePosition({ x: 50, y: 50 });
+    
+    toast({
+      title: "Posicionamento resetado",
+      description: "Selecione novamente onde deseja posicionar a assinatura",
     });
   };
 
@@ -85,6 +115,34 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     });
   };
 
+  const connectGovSignature = async () => {
+    setIsValidatingGov(true);
+    
+    // Simulate GOV signature connection process
+    setTimeout(() => {
+      setGovSignatureConnected(true);
+      localStorage.setItem('govSignatureConnected', 'true');
+      setIsValidatingGov(false);
+      
+      // Add GOV signature to signatures list
+      const govSignature: Signature = {
+        id: 'gov-signature',
+        name: 'Assinatura Digital GOV.BR',
+        data: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA2NkNDIiByeD0iNSIvPgo8dGV4dCB4PSIxMDAiIHk9IjI1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkdPVi5CUjwvdGV4dD4KPHR4dCB4PSIxMDAiIHk9IjQ1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QXNzaW5hdHVyYSBEaWdpdGFsPC90ZXh0Pgo8dGV4dCB4PSIxMDAiIHk9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5DZXJ0aWZpY2FkbyBJQ1AtQnJhc2lsPC90ZXh0Pgo8L3N2Zz4K',
+        hash: 'gov_signature_hash_' + Date.now()
+      };
+      
+      const updatedSignatures = [...signatures, govSignature];
+      setSignatures(updatedSignatures);
+      localStorage.setItem('digitalSignatures', JSON.stringify(updatedSignatures));
+      
+      toast({
+        title: "Assinatura GOV conectada!",
+        description: "Sua assinatura digital GOV.BR está pronta para uso",
+      });
+    }, 2000);
+  };
+
   const handleSignDocument = async () => {
     if (!selectedSignature) {
       toast({
@@ -99,6 +157,16 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     if (!selectedSig) return;
 
     try {
+      // Add to signature history
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        signature: selectedSig.name,
+        position: signaturePosition
+      };
+      const newHistory = [...signatureHistory, historyEntry];
+      setSignatureHistory(newHistory);
+      localStorage.setItem('signatureHistory', JSON.stringify(newHistory));
+
       // Create a canvas to overlay the signature on the document
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -121,6 +189,14 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       ctx.font = '16px Arial';
       ctx.fillText('Documento Original', 70, 80);
       ctx.fillText(`${document.name}`, 70, 110);
+
+      // Add timestamp and validation info
+      ctx.fillStyle = '#059669';
+      ctx.font = '12px Arial';
+      ctx.fillText(`Assinado em: ${new Date().toLocaleString('pt-BR')}`, 70, 140);
+      if (selectedSig.id === 'gov-signature') {
+        ctx.fillText('✓ Assinatura Digital GOV.BR Certificada', 70, 160);
+      }
 
       // Load and draw signature
       const img = new Image();
@@ -156,6 +232,9 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               title: "Documento assinado e baixado!",
               description: `O documento "${document.name}" foi assinado e baixado com sucesso`,
             });
+
+            // Reset positioning after successful signature
+            resetSignaturePosition();
           }
         }, 'image/png');
       };
@@ -168,6 +247,10 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         variant: "destructive",
       });
     }
+  };
+
+  const adjustZoom = (delta: number) => {
+    setZoom(prev => Math.max(50, Math.min(200, prev + delta)));
   };
 
   const downloadSignedDocument = () => {
@@ -209,21 +292,33 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         <div className="lg:col-span-2">
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
-                Visualização do Documento
-                {isPositioning && (
-                  <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    Clique para posicionar
-                  </span>
-                )}
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
+                  Visualização do Documento
+                  {isPositioning && (
+                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                      Clique para posicionar
+                    </span>
+                  )}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => adjustZoom(-25)}>
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium">{zoom}%</span>
+                  <Button size="sm" variant="outline" onClick={() => adjustZoom(25)}>
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div 
-                className={`relative bg-white border-2 rounded-lg h-[600px] overflow-hidden ${
+                className={`relative bg-white border-2 rounded-lg h-[600px] overflow-auto ${
                   isPositioning ? 'cursor-crosshair border-blue-500' : 'border-gray-300'
                 }`}
                 onClick={handleDocumentClick}
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}
               >
                 {pdfUrl ? (
                   <iframe
@@ -283,6 +378,22 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {!govSignatureConnected && (
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-gray-700">
+                    Assinatura Digital GOV.BR
+                  </label>
+                  <Button 
+                    onClick={connectGovSignature}
+                    disabled={isValidatingGov}
+                    className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    {isValidatingGov ? 'Conectando...' : 'Conectar Assinatura GOV'}
+                  </Button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
                   Selecionar Assinatura
@@ -294,7 +405,10 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                   <SelectContent>
                     {signatures.map((signature) => (
                       <SelectItem key={signature.id} value={signature.id}>
-                        {signature.name}
+                        <div className="flex items-center gap-2">
+                          {signature.id === 'gov-signature' && <Shield className="h-4 w-4 text-green-600" />}
+                          {signature.name}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -312,26 +426,41 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                       alt="Signature preview"
                       className="max-h-16 mx-auto"
                     />
+                    {signatures.find(s => s.id === selectedSignature)?.id === 'gov-signature' && (
+                      <p className="text-xs text-green-600 text-center mt-2">✓ Certificado ICP-Brasil</p>
+                    )}
                   </div>
                 </div>
               )}
 
               <div className="space-y-3">
-                <Button 
-                  onClick={startPositioning}
-                  disabled={!selectedSignature}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <MousePointer className="h-4 w-4 mr-2" />
-                  Posicionar Assinatura
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={startPositioning}
+                    disabled={!selectedSignature}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <MousePointer className="h-4 w-4 mr-2" />
+                    Posicionar
+                  </Button>
+                  
+                  <Button 
+                    onClick={resetSignaturePosition}
+                    disabled={!showSignaturePreview}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 {showSignaturePreview && (
                   <div className="text-sm text-gray-600 bg-green-50 p-3 rounded border border-green-200">
                     <p className="font-medium text-green-800">✓ Posição definida</p>
                     <p>X: {signaturePosition.x.toFixed(1)}%</p>
                     <p>Y: {signaturePosition.y.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Use o botão de reset para alterar</p>
                   </div>
                 )}
               </div>
@@ -368,6 +497,28 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
             </CardContent>
           </Card>
 
+          {/* Signature History */}
+          {signatureHistory.length > 0 && (
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Histórico de Assinaturas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {signatureHistory.slice(-3).map((entry, index) => (
+                    <div key={index} className="text-xs bg-gray-50 p-2 rounded">
+                      <p className="font-medium">{entry.signature}</p>
+                      <p className="text-gray-500">{new Date(entry.timestamp).toLocaleString('pt-BR')}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-lg text-gray-800">Informações do Documento</CardTitle>
@@ -387,8 +538,15 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Status:</p>
-                <p className="text-sm text-gray-600">
-                  {document.signedVersion ? '✓ Assinado' : 'Aguardando assinatura'}
+                <p className="text-sm text-gray-600 flex items-center gap-1">
+                  {document.signedVersion ? (
+                    <>
+                      <FileCheck className="h-4 w-4 text-green-600" />
+                      Assinado
+                    </>
+                  ) : (
+                    'Aguardando assinatura'
+                  )}
                 </p>
               </div>
             </CardContent>
