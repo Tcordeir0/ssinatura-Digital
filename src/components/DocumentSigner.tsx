@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -324,12 +323,12 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
 
     try {
       const url = URL.createObjectURL(signedPdfBlob);
-      const downloadLink = globalThis.document.createElement('a');
+      const downloadLink = document.createElement('a');
       downloadLink.href = url;
       downloadLink.download = `${document.name.replace('.pdf', '')}_assinado.pdf`;
-      globalThis.document.body.appendChild(downloadLink);
+      document.body.appendChild(downloadLink);
       downloadLink.click();
-      globalThis.document.body.removeChild(downloadLink);
+      document.body.removeChild(downloadLink);
       URL.revokeObjectURL(url);
 
       console.log('Download realizado com sucesso');
