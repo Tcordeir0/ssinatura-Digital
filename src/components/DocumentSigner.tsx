@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -128,7 +127,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       const govSignature: Signature = {
         id: 'gov-signature',
         name: 'Assinatura Digital GOV.BR',
-        data: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA2NkNDIiByeD0iNSIvPgo8dGV4dCB4PSIxMDAiIHk9IjI1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkdPVi5CUjwvdGV4dD4KPHR4dCB4PSIxMDAiIHk9IjQ1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QXNzaW5hdHVyYSBEaWdpdGFsPC90ZXh0Pgo8dGV4dCB4PSIxMDAiIHk9IjYwIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5DZXJ0aWZpY2FkbyBJQ1AtQnJhc2lsPC90ZXh0Pgo8L3N2Zz4K',
+        data: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjAwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjMDA2NkNDIiByeD0iNSIvPgo8dGV4dCB4PSIxMDAiIHk9IjI1IiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9ImJvbGQiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkdPVi5CUjwvdGV4dD4KPHRleHQgeD0iMTAwIiB5PSI0NSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkFzc2luYXR1cmEgRGlnaXRhbDwvdGV4dD4KPHRleHQgeD0iMTAwIiB5PSI2MCIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q2VydGlmaWNhZG8gSUNQLUJyYXNpbDwvdGV4dD4KPC9zdmc+Cg==',
         hash: 'gov_signature_hash_' + Date.now()
       };
       
@@ -337,18 +336,18 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 style={{ height: '700px' }}
               >
                 {pdfUrl ? (
-                  <iframe
-                    ref={pdfViewerRef}
-                    src={`${pdfUrl}#zoom=${zoom}`}
-                    className="w-full h-full border-0"
-                    title="Document Preview"
-                    style={{ 
-                      transform: `scale(${zoom / 100})`,
-                      transformOrigin: 'top left',
-                      width: `${100 / (zoom / 100)}%`,
-                      height: `${100 / (zoom / 100)}%`
-                    }}
-                  />
+                  <ScrollArea className="w-full h-full">
+                    <iframe
+                      ref={pdfViewerRef}
+                      src={`${pdfUrl}#view=FitH&toolbar=0&navpanes=0&scrollbar=1`}
+                      className="w-full border-0"
+                      title="Document Preview"
+                      style={{ 
+                        height: '800px',
+                        minHeight: '100%'
+                      }}
+                    />
+                  </ScrollArea>
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-500">
                     <div className="text-center">
@@ -381,7 +380,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 {isPositioning && (
                   <div className="absolute inset-0 bg-blue-50/20 flex items-center justify-center z-10">
                     <div className="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
-                      <MousePointer className="h-4 w-4" />
+                      <Move className="h-4 w-4" />
                       Clique onde deseja aplicar a assinatura
                     </div>
                   </div>
@@ -416,7 +415,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
-                <PenTool className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
                 Configurações de Assinatura
               </CardTitle>
             </CardHeader>
@@ -468,7 +467,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                     variant="outline"
                     className="flex-1"
                   >
-                    <MousePointer className="h-4 w-4 mr-2" />
+                    <Move className="h-4 w-4 mr-2" />
                     Posicionar
                   </Button>
                   
@@ -478,7 +477,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                     variant="outline"
                     size="sm"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCw className="h-4 w-4" />
                   </Button>
                 </div>
 
@@ -506,7 +505,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                   disabled={!selectedSignature || !showSignaturePreview || !document.file}
                   className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <CheckCircle className="h-4 w-4 mr-2" />
                   Assinar Documento
                 </Button>
 
@@ -566,7 +565,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 <p className="text-sm text-gray-600 flex items-center gap-1">
                   {signedPdfBlob ? (
                     <>
-                      <FileCheck className="h-4 w-4 text-green-600" />
+                      <CheckCircle className="h-4 w-4 text-green-600" />
                       Assinado
                     </>
                   ) : (
