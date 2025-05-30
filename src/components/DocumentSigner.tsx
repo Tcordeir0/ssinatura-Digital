@@ -31,7 +31,7 @@ interface DocumentSignerProps {
   onSigned: (document: Document) => void;
 }
 
-const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSigned }) => {
+const DocumentSigner: React.FC<DocumentSignerProps> = ({ document: documentProp, onBack, onSigned }) => {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [selectedSignature, setSelectedSignature] = useState<string>('');
   const [signaturePosition, setSignaturePosition] = useState({ x: 50, y: 50 });
@@ -62,12 +62,12 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
 
     checkGovSignatureStatus();
 
-    if (document.file) {
-      const url = URL.createObjectURL(document.file);
+    if (documentProp.file) {
+      const url = URL.createObjectURL(documentProp.file);
       setPdfUrl(url);
       return () => URL.revokeObjectURL(url);
     }
-  }, [document.file]);
+  }, [documentProp.file]);
 
   const checkGovSignatureStatus = () => {
     const govConnected = localStorage.getItem('govSignatureConnected');
@@ -188,8 +188,8 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       ctx.fillStyle = '#000000';
       ctx.font = `${12 * scale}px Arial`;
       ctx.fillText('DOCUMENTO ORIGINAL', 50 * scale, 50 * scale);
-      ctx.fillText(`Nome: ${document.name}`, 50 * scale, 80 * scale);
-      ctx.fillText(`Tipo: ${document.type}`, 50 * scale, 110 * scale);
+      ctx.fillText(`Nome: ${documentProp.name}`, 50 * scale, 80 * scale);
+      ctx.fillText(`Tipo: ${documentProp.type}`, 50 * scale, 110 * scale);
       ctx.fillText(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 50 * scale, 140 * scale);
       
       // Adicionar linhas simulando conteúdo
@@ -246,7 +246,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   const handleSignDocument = async () => {
     console.log('Iniciando processo de assinatura...');
     
-    if (!selectedSignature || !document.file) {
+    if (!selectedSignature || !documentProp.file) {
       toast({
         title: "Erro",
         description: "Selecione uma assinatura e certifique-se de que há um documento carregado",
@@ -274,7 +274,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       console.log('Aplicando assinatura:', selectedSig.name);
       
       // Criar PDF com assinatura visível
-      const signedBlob = await renderPdfWithSignature(document.file, selectedSig.data, signaturePosition);
+      const signedBlob = await renderPdfWithSignature(documentProp.file, selectedSig.data, signaturePosition);
       setSignedPdfBlob(signedBlob);
       
       // Criar URL para preview do documento assinado
@@ -325,7 +325,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       const url = URL.createObjectURL(signedPdfBlob);
       const downloadLink = document.createElement('a');
       downloadLink.href = url;
-      downloadLink.download = `${document.name.replace('.pdf', '')}_assinado.pdf`;
+      downloadLink.download = `${documentProp.name.replace('.pdf', '')}_assinado.pdf`;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -360,7 +360,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         </Button>
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Assinar Documento</h2>
-          <p className="text-gray-600">{document.name}</p>
+          <p className="text-gray-600">{documentProp.name}</p>
           {isDocumentSigned && (
             <Badge className="mt-1 bg-green-100 text-green-800">
               <CheckCircle className="h-3 w-3 mr-1" />
@@ -472,6 +472,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
           </Card>
         </div>
 
+        
         <div className="space-y-6">
           {!govSignatureConnected && (
             <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
@@ -592,7 +593,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               <div className="flex flex-col gap-3">
                 <Button 
                   onClick={handleSignDocument}
-                  disabled={!selectedSignature || !showSignaturePreview || !document.file || isDocumentSigned}
+                  disabled={!selectedSignature || !showSignaturePreview || !documentProp.file || isDocumentSigned}
                   className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
@@ -640,15 +641,15 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
             <CardContent className="space-y-2">
               <div>
                 <p className="text-sm font-medium text-gray-700">Nome:</p>
-                <p className="text-sm text-gray-600">{document.name}</p>
+                <p className="text-sm text-gray-600">{documentProp.name}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Tipo:</p>
-                <p className="text-sm text-gray-600">{document.type}</p>
+                <p className="text-sm text-gray-600">{documentProp.type}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Data de Upload:</p>
-                <p className="text-sm text-gray-600">{document.uploadDate}</p>
+                <p className="text-sm text-gray-600">{documentProp.uploadDate}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700">Status:</p>
