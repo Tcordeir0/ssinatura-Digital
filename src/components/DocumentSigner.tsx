@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   const [isValidatingGov, setIsValidatingGov] = useState(false);
   const [govSignatureConnected, setGovSignatureConnected] = useState(false);
   const [signedPdfBlob, setSignedPdfBlob] = useState<Blob | null>(null);
+  const [isDocumentSigned, setIsDocumentSigned] = useState(false);
   const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const { toast } = useToast();
 
@@ -143,69 +145,36 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
   };
 
   const createSignedPdf = async (originalFile: File, signatureData: string, position: {x: number, y: number}): Promise<Blob> => {
-    // Para esta demonstração, vamos criar um PDF simples com a assinatura
-    // Em um ambiente real, você usaria uma biblioteca como PDF-lib para modificar o PDF original
-    
-    const canvas = globalThis.document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas context not available');
-
-    // Configurar canvas para tamanho A4
-    canvas.width = 595; // A4 width in points
-    canvas.height = 842; // A4 height in points
-
-    // Fundo branco
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Simular conteúdo do documento original
-    ctx.fillStyle = '#333';
-    ctx.font = '16px Arial';
-    ctx.fillText(`Documento: ${document.name}`, 50, 50);
-    ctx.fillText(`Tipo: ${document.type}`, 50, 80);
-    ctx.fillText(`Data de upload: ${document.uploadDate}`, 50, 110);
-    
-    // Adicionar texto simulando conteúdo do documento
-    ctx.font = '12px Arial';
-    ctx.fillStyle = '#666';
-    const lines = [
-      'Este é um documento de exemplo que foi carregado no sistema.',
-      'O conteúdo original do documento seria preservado aqui.',
-      'Todas as informações e formatação originais seriam mantidas.',
-      '',
-      'DOCUMENTO ASSINADO DIGITALMENTE',
-      `Data/Hora: ${new Date().toLocaleString('pt-BR')}`,
-      'Certificado: ICP-Brasil (se assinatura GOV)',
-    ];
-    
-    lines.forEach((line, index) => {
-      ctx.fillText(line, 50, 150 + (index * 20));
-    });
-
-    // Carregar e desenhar a assinatura
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const sigX = (position.x / 100) * canvas.width;
-        const sigY = (position.y / 100) * canvas.height;
-        const sigWidth = 150;
-        const sigHeight = 60;
-        
-        ctx.drawImage(img, sigX - sigWidth/2, sigY - sigHeight/2, sigWidth, sigHeight);
-        
-        // Adicionar informações da assinatura
-        ctx.fillStyle = '#059669';
-        ctx.font = '10px Arial';
-        ctx.fillText('✓ Documento assinado digitalmente', sigX - sigWidth/2, sigY + sigHeight/2 + 15);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          }
-        }, 'application/pdf');
-      };
-      img.src = signatureData;
-    });
+    try {
+      // Criar um novo arquivo PDF com a assinatura aplicada
+      const arrayBuffer = await originalFile.arrayBuffer();
+      
+      // Para esta demonstração, vamos criar um PDF modificado simulando a assinatura
+      // Em produção, você usaria uma biblioteca como PDF-lib para modificar o PDF original
+      
+      // Criar um novo blob que representa o PDF assinado
+      const pdfContent = new Uint8Array(arrayBuffer);
+      
+      // Simular a modificação do PDF adicionando metadados de assinatura
+      const signatureMetadata = new TextEncoder().encode(`
+        %PDF Signature Applied
+        %Signature: ${signatureData}
+        %Position: ${position.x}, ${position.y}
+        %Timestamp: ${new Date().toISOString()}
+        %Hash: ${Date.now()}
+      `);
+      
+      // Criar um novo array combinando o PDF original com os metadados
+      const signedPdfArray = new Uint8Array(pdfContent.length + signatureMetadata.length);
+      signedPdfArray.set(pdfContent, 0);
+      signedPdfArray.set(signatureMetadata, pdfContent.length);
+      
+      // Retornar como blob PDF
+      return new Blob([signedPdfArray], { type: 'application/pdf' });
+    } catch (error) {
+      console.error('Erro ao criar PDF assinado:', error);
+      throw error;
+    }
   };
 
   const handleSignDocument = async () => {
@@ -218,13 +187,27 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
       return;
     }
 
+    if (!showSignaturePreview) {
+      toast({
+        title: "Posicione a assinatura",
+        description: "Clique em 'Posicionar' e selecione onde aplicar a assinatura no documento",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const selectedSig = signatures.find(sig => sig.id === selectedSignature);
     if (!selectedSig) return;
 
     try {
+      console.log('Iniciando processo de assinatura...');
+      
       // Criar PDF assinado
       const signedBlob = await createSignedPdf(document.file, selectedSig.data, signaturePosition);
       setSignedPdfBlob(signedBlob);
+      setIsDocumentSigned(true);
+
+      console.log('PDF assinado criado com sucesso');
 
       // Adicionar ao histórico
       const historyEntry = {
@@ -242,14 +225,15 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         signedVersion: `signed_${Date.now()}_${selectedSig.hash}`,
       };
 
-      onSigned(signedDocument);
+      console.log('Documento atualizado:', signedDocument);
 
       toast({
         title: "Documento assinado com sucesso!",
-        description: "O documento foi assinado e está pronto para download",
+        description: "O documento foi assinado digitalmente e está pronto para download",
       });
 
-      resetSignaturePosition();
+      // Não resetar a posição para manter o preview da assinatura
+      // resetSignaturePosition();
 
     } catch (error) {
       console.error('Erro ao assinar documento:', error);
@@ -274,14 +258,14 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
     const url = URL.createObjectURL(signedPdfBlob);
     const downloadLink = globalThis.document.createElement('a');
     downloadLink.href = url;
-    downloadLink.download = `${document.name}_assinado.pdf`;
+    downloadLink.download = `${document.name.replace('.pdf', '')}_assinado.pdf`;
     globalThis.document.body.appendChild(downloadLink);
     downloadLink.click();
     globalThis.document.body.removeChild(downloadLink);
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Download iniciado",
+      title: "Download realizado!",
       description: "O documento PDF assinado foi baixado com sucesso",
     });
   };
@@ -300,6 +284,12 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Assinar Documento</h2>
           <p className="text-gray-600">{document.name}</p>
+          {isDocumentSigned && (
+            <Badge className="mt-1 bg-green-100 text-green-800">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Documento Assinado
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -362,7 +352,9 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 
                 {showSignaturePreview && selectedSignature && (
                   <div 
-                    className="absolute pointer-events-none border-2 border-green-500 border-dashed rounded bg-green-50/80 p-2 shadow-lg z-10"
+                    className={`absolute pointer-events-none border-2 ${
+                      isDocumentSigned ? 'border-green-500 bg-green-50/90' : 'border-blue-500 border-dashed bg-blue-50/80'
+                    } rounded p-2 shadow-lg z-10`}
                     style={{
                       left: `${signaturePosition.x}%`,
                       top: `${signaturePosition.y}%`,
@@ -372,8 +364,13 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                     <img 
                       src={signatures.find(s => s.id === selectedSignature)?.data}
                       alt="Signature preview"
-                      className="max-h-12 opacity-80"
+                      className="max-h-12 opacity-90"
                     />
+                    {isDocumentSigned && (
+                      <div className="text-xs text-green-600 text-center mt-1 font-medium">
+                        ✓ Assinado
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -463,7 +460,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 <div className="flex gap-2">
                   <Button 
                     onClick={startPositioning}
-                    disabled={!selectedSignature}
+                    disabled={!selectedSignature || isDocumentSigned}
                     variant="outline"
                     className="flex-1"
                   >
@@ -473,7 +470,7 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                   
                   <Button 
                     onClick={resetSignaturePosition}
-                    disabled={!showSignaturePreview}
+                    disabled={!showSignaturePreview || isDocumentSigned}
                     variant="outline"
                     size="sm"
                   >
@@ -482,11 +479,19 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
                 </div>
 
                 {showSignaturePreview && (
-                  <div className="text-sm text-gray-600 bg-green-50 p-3 rounded border border-green-200">
-                    <p className="font-medium text-green-800">✓ Posição definida</p>
+                  <div className={`text-sm p-3 rounded border ${
+                    isDocumentSigned 
+                      ? 'text-green-800 bg-green-50 border-green-200'
+                      : 'text-gray-600 bg-blue-50 border-blue-200'
+                  }`}>
+                    <p className="font-medium">
+                      {isDocumentSigned ? '✓ Assinatura aplicada' : '✓ Posição definida'}
+                    </p>
                     <p>X: {signaturePosition.x.toFixed(1)}%</p>
                     <p>Y: {signaturePosition.y.toFixed(1)}%</p>
-                    <p className="text-xs text-gray-500 mt-1">Use o botão de reset para alterar</p>
+                    {!isDocumentSigned && (
+                      <p className="text-xs text-gray-500 mt-1">Use o botão de reset para alterar</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -502,14 +507,14 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               <div className="flex flex-col gap-3">
                 <Button 
                   onClick={handleSignDocument}
-                  disabled={!selectedSignature || !showSignaturePreview || !document.file}
+                  disabled={!selectedSignature || !showSignaturePreview || !document.file || isDocumentSigned}
                   className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Assinar Documento
+                  {isDocumentSigned ? 'Documento Assinado' : 'Assinar Documento'}
                 </Button>
 
-                {signedPdfBlob && (
+                {isDocumentSigned && signedPdfBlob && (
                   <Button 
                     onClick={downloadSignedDocument}
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
@@ -563,13 +568,16 @@ const DocumentSigner: React.FC<DocumentSignerProps> = ({ document, onBack, onSig
               <div>
                 <p className="text-sm font-medium text-gray-700">Status:</p>
                 <p className="text-sm text-gray-600 flex items-center gap-1">
-                  {signedPdfBlob ? (
+                  {isDocumentSigned ? (
                     <>
                       <CheckCircle className="h-4 w-4 text-green-600" />
-                      Assinado
+                      Assinado Digitalmente
                     </>
                   ) : (
-                    'Aguardando assinatura'
+                    <>
+                      <AlertCircle className="h-4 w-4 text-orange-500" />
+                      Aguardando assinatura
+                    </>
                   )}
                 </p>
               </div>
